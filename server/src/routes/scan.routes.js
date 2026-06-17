@@ -10,11 +10,13 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 // Protected scan endpoints
-router.post('/url', requireAuth, scanUrl);
-router.post('/email', requireAuth, scanEmail);
+const { scansLimiter } = require('../middleware/rateLimit');
+
+router.post('/url', requireAuth, scansLimiter, scanUrl);
+router.post('/email', requireAuth, scansLimiter, scanEmail);
 
 // Protected dashboard endpoints
-router.get('/history', requireAuth, getMyHistory);
-router.get('/stats', requireAuth, getMyStats);
+router.get('/history', requireAuth, scansLimiter, getMyHistory);
+router.get('/stats', requireAuth, scansLimiter, getMyStats);
 
 module.exports = router;

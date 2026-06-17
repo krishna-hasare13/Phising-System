@@ -48,7 +48,7 @@ describe('Scan Routes + Dashboard', () => {
   const authHeader = () => ({ Authorization: `Bearer ${token}` });
 
   test('Unauthorized requests are blocked (history)', async () => {
-    const res = await request(app).get('/api/scans/history');
+    const res = await request(app).get('/api/scans/history?scanType=url');
     expect(res.status).toBe(401);
   });
 
@@ -74,7 +74,7 @@ describe('Scan Routes + Dashboard', () => {
   });
 
   test('History returns saved scans (200)', async () => {
-    const res = await request(app).get('/api/scans/history').set(authHeader());
+    const res = await request(app).get('/api/scans/history?scanType=url').set(authHeader());
     expect(res.status).toBe(200);
 
     const historyArray =

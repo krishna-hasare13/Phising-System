@@ -76,7 +76,8 @@ export default function DashboardClient() {
 
     try {
       const endpoint = activeTab === 'url' ? '/scans/url' : '/scans/email';
-      const payload = activeTab === 'url' ? { url: scanInput } : { emailContent: scanInput };
+      // Backend expects: { url } for URL scans and { content } for email scans
+      const payload = activeTab === 'url' ? { url: scanInput } : { content: scanInput };
 
       const res = await axios.post(`${apiBase}${endpoint}`, payload, {
         headers: { Authorization: `Bearer ${token}` }
