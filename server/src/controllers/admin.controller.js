@@ -318,6 +318,71 @@ async function updateReportStatus(req, res, next) {
   }
 }
 
+/**
+ * Create a new report (for users to report suspicious content)
+ */
+async function createReport(req, res, next) {
+  try {
+    const { reportType, details } = req.body;
+    const userId = req.user.id;
+    
+    if (!['url', 'email', 'system'].includes(reportType)) {
+      return res.status(400).json({ message: 'Invalid report type' });
+    }
+    
+    if (!details || typeof details !== 'object') {
+      return res.status(400).json({ message: 'Report details are required' });
+    }
+    
+    const report = await Report.create({
+      reportType,
+      details,
+      userId,
+      status: 'pending'
+    });
+    
+    res.status(201).json({
+      message: 'Report created successfully',
+      report
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get user's own reports
+ */
+async function getUserReports(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const [reports, total] = await Promise.all([
+      Report.find({ userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Report.countDocuments({ userId })
+    ]);
+    
+    res.json({
+      message: 'User reports fetched successfully',
+      reports,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -326,5 +391,7 @@ module.exports = {
   getSystemAnalytics,
   getAllDetectionLogs,
   getAllReports,
-  updateReportStatus
+  updateReportStatus,
+  createReport,
+  getUserReports
 };

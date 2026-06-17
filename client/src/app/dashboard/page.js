@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { getToken, clearToken, getUserRole } from '../../lib/auth';
-import { LogOut, ShieldAlert, ShieldCheck, Mail, Link as LinkIcon, RefreshCcw, Loader2, Settings } from 'lucide-react';
+import { LogOut, ShieldAlert, ShieldCheck, Mail, Link as LinkIcon, RefreshCcw, Loader2, Settings, FileText } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -17,6 +17,8 @@ export default function DashboardClient() {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState([]);
+  const [showReports, setShowReports] = useState(false);
 
   // Scan states
   const [activeTab, setActiveTab] = useState('url'); // 'url' or 'email'
@@ -62,6 +64,43 @@ export default function DashboardClient() {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadReports() {
+    if (!token) return;
+    try {
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${apiBase}/reports/my-reports`, { headers: authHeaders });
+      setReports(res.data.reports || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function generateReport(scanId) {
+    if (!token) return;
+    try {
+      const scan = history.find(h => h._id === scanId);
+      if (!scan) return;
+
+      const authHeaders = { Authorization: `Bearer ${token}` };
+      await axios.post(`${apiBase}/reports`, {
+        reportType: scan.scanType === 'url' ? 'url' : 'email',
+        details: {
+          scanId: scan._id,
+          content: scan.content,
+          result: scan.result,
+          flaggedKeywords: scan.flaggedKeywords,
+          createdAt: scan.createdAt
+        }
+      }, { headers: authHeaders });
+
+      alert('Report generated successfully!');
+      loadReports();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate report');
     }
   }
 
@@ -120,6 +159,16 @@ export default function DashboardClient() {
           <p className="text-muted-foreground mt-1">Analyze URLs and emails, and view your scan history.</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowReports(!showReports);
+              if (!showReports) loadReports();
+            }}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 border"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            {showReports ? 'Hide Reports' : 'My Reports'}
+          </button>
           {userRole === 'admin' && (
             <button
               onClick={() => router.push('/admin')}
@@ -208,6 +257,63 @@ export default function DashboardClient() {
                 <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* My Reports Section */}
+      {showReports && (
+        <div className="border rounded-xl shadow-sm bg-card mb-8">
+          <div className="p-6 border-b flex justify-between items-center bg-muted/20">
+            <div>
+              <h2 className="text-xl font-semibold">My Reports</h2>
+              <p className="text-sm text-muted-foreground mt-1">Reports you've generated from scan results</p>
+            </div>
+            <button
+              onClick={loadReports}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Refresh"
+            >
+              <RefreshCcw className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-6">
+            {reports.length ? (
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-semibold uppercase tracking-wider">Type</th>
+                    <th scope="col" className="px-4 py-3 font-semibold uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-4 py-3 font-semibold uppercase tracking-wider">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {reports.map((report) => (
+                    <tr key={report._id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 capitalize">{report.reportType}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${
+                          report.status === 'pending' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                          report.status === 'reviewed' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                          'bg-green-100 text-green-800 border-green-200'
+                        }`}>
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{new Date(report.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 text-center">
+                <div className="bg-muted p-4 rounded-full mb-4">
+                  <FileText className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-lg">No reports yet</h3>
+                <p className="text-sm text-muted-foreground mt-1">Generate reports from your scan history using the "Report" button</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -326,6 +432,7 @@ export default function DashboardClient() {
                     <th scope="col" className="px-6 py-3 font-semibold uppercase tracking-wider">Content</th>
                     <th scope="col" className="px-6 py-3 font-semibold uppercase tracking-wider">Risk %</th>
                     <th scope="col" className="px-6 py-3 font-semibold uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 font-semibold uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -346,6 +453,16 @@ export default function DashboardClient() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {renderThreatBadge(h.result?.threatStatus)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => generateReport(h._id)}
+                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
+                          title="Generate Report"
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          Report
+                        </button>
                       </td>
                     </tr>
                   ))}
